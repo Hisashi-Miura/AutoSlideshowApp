@@ -32,13 +32,19 @@ class MainActivity : AppCompatActivity() {
 
         val resolver = contentResolver//★2
 
+        start_button.text="再生"
 
-
+        start_button.isClickable = false
+        susumu_button.isClickable = false
+        modoru_button.isClickable = false
         // Android 6.0以降の場合
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // パーミッションの許可状態を確認する
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
 
+                start_button.isClickable = true
+                susumu_button.isClickable = true
+                modoru_button.isClickable = true
                 // 許可されている
                 Log.d("slideshowapp", "android6パーミッション有り")
 
@@ -59,107 +65,134 @@ class MainActivity : AppCompatActivity() {
                 }
             } else {
                 // 許可されていないので許可ダイアログを表示する
+                //permissionOK=false
                 requestPermissions(
                     arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                     PERMISSIONS_REQUEST_CODE
                 )
                 Log.d("slideshowapp", "android6パーミッション無し")
-                timer.text="画像の読み込みを許可して、アプリを再起動してください。"
+                timer.text="画像の読み込みを許可された状態で、アプリを再起動してください。"
+                susumu_button.isClickable = false
+                modoru_button.isClickable = false
             }
             // Android 5系以下の場合
         } else {
             Log.d("slideshowapp", "android5")//カーソル読み込み処理ないので、落ちる
+            cursor=resolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // データの種類
+                null, // 項目（null = 全項目）
+                null, // フィルタ条件（null = フィルタなし）
+                null, // フィルタ用パラメータ
+                null // ソート (nullソートなし）
+            )
         }
+
 
         start_button.setOnClickListener {//自動スライド処理
             if (mTimer == null) {
+                mHandler.post {
+                    start_button.text="停止"
+                }
                 mTimer = Timer()
                 mTimer!!.schedule(object : TimerTask() {
                     override fun run() {
                         susumu_button.isClickable = false
                         modoru_button.isClickable = false
 
+                        if(cursor!=null){
+                            if (cursor!!.moveToNext()) {
+                                // indexからIDを取得し、そのIDから画像のURIを取得する
+                                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                                val id = cursor!!.getLong(fieldIndex)
+                                val imageUri = ContentUris.withAppendedId(
+                                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                    id
+                                )
+                                Log.d("slideshowapp", "タイマー起動中")
 
+                                mHandler.post {
+                                    imageView.setImageURI(imageUri)
 
-                        if (cursor!!.moveToNext()) {
-                            // indexからIDを取得し、そのIDから画像のURIを取得する
-                            val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                            val id = cursor!!.getLong(fieldIndex)
-                            val imageUri = ContentUris.withAppendedId(
-                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                id
-                            )
-                            Log.d("slideshowapp", "タイマー起動中")
+                                }
+                            } else {
+                                cursor!!.moveToFirst()
+                                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                                val id = cursor!!.getLong(fieldIndex)
+                                val imageUri = ContentUris.withAppendedId(
+                                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                    id
+                                )
 
-                            mHandler.post {
-                                imageView.setImageURI(imageUri)
+                                mHandler.post {
+                                    imageView.setImageURI(imageUri)
 
-                            }
-                        } else {
-                            cursor!!.moveToFirst()
-                            val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                            val id = cursor!!.getLong(fieldIndex)
-                            val imageUri = ContentUris.withAppendedId(
-                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                id
-                            )
-
-                            mHandler.post {
-                                imageView.setImageURI(imageUri)
-
+                                }
                             }
                         }
+
+
                     }
                 }, 2000, 2000) // 最初に始動させるまで2000ミリ秒、ループの間隔を2000ミリ秒 に設定
             } else {
                 if (mTimer != null) {
                     susumu_button.isClickable = true//ボタン無効化処理
                     modoru_button.isClickable = true
+
                     mTimer!!.cancel()
                     mTimer = null
+                    mHandler.post {
+                        start_button.text="再生"
+                    }
                 }
             }
         }
 
         susumu_button.setOnClickListener {//進むボタン処理
-            if (cursor!!.moveToNext()) {
-                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                val id = cursor!!.getLong(fieldIndex)
-                val imageUri =
-                    ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            if (cursor!=null){
+                if (cursor!!.moveToNext()) {
+                    val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                    val id = cursor!!.getLong(fieldIndex)
+                    val imageUri =
+                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
-                imageView.setImageURI(imageUri)
-            } else {
-                cursor!!.moveToFirst()
-                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                val id = cursor!!.getLong(fieldIndex)
-                val imageUri =
-                    ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                    imageView.setImageURI(imageUri)
+                } else if(cursor!=null) {
+                    cursor!!.moveToFirst()
+                    val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                    val id = cursor!!.getLong(fieldIndex)
+                    val imageUri =
+                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
-                imageView.setImageURI(imageUri)
+                    imageView.setImageURI(imageUri)
+                }
             }
+
         }
 
 
         modoru_button.setOnClickListener {//戻るボタン処理
-            if (cursor!!.moveToPrevious()) {
-                // indexからIDを取得し、そのIDから画像のURIを取得する
-                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                val id = cursor!!.getLong(fieldIndex)
-                val imageUri =
-                    ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            if (cursor!=null){
+                if (cursor!!.moveToPrevious()) {
+                    // indexからIDを取得し、そのIDから画像のURIを取得する
+                    val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                    val id = cursor!!.getLong(fieldIndex)
+                    val imageUri =
+                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
-                imageView.setImageURI(imageUri)
-            } else {
-                cursor!!.moveToLast()
-                val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
-                val id = cursor!!.getLong(fieldIndex)
-                val imageUri =
-                    ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                    imageView.setImageURI(imageUri)
+                } else if(cursor!=null) {
+                    cursor!!.moveToLast()
+                    val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+                    val id = cursor!!.getLong(fieldIndex)
+                    val imageUri =
+                        ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
-                imageView.setImageURI(imageUri)
+                    imageView.setImageURI(imageUri)
+
+                }
 
             }
+
         }
     }
 }
